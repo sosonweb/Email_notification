@@ -18,6 +18,7 @@ logging.basicConfig(level=int(log_level), format='%(asctime)s :: %(levelname)s :
 
 
 def main():
+    print(os.environ)
     notification_map_str = os.getenv('NOTIFICATION_MAP')
     notification_flag = yaml.safe_load(os.getenv('NOTIFY_FLAGS'))
     if not notification_map_str:
