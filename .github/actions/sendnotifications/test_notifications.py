@@ -13,6 +13,7 @@ from main import send_email_notification  # Replace with your actual module name
     'NOTIFY_FLAGS': '{"send-teams-notification": true}'
 })
 def test_send_email_notification_with_all_vars(mock_smtp):
+    print(os.environ)
     # Define test data
     message = "<p>This is a test message</p>"
     recipients = ["test@example.com"]
