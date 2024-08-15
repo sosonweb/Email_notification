@@ -29,7 +29,7 @@ def main():
         if notification_map.get('app_props') and notification_map.get('app_props').get('notification_map'): 
             email_recipients = notification_map['app_props'].get('notification_map').get('email_recipients')
             teams_channel = notification_map['app_props'].get('notification_map').get('teams_channel')
-        else:
+        else:f
             email_recipients = notification_map.get('email_recipients')
             teams_channel = notification_map.get('teams_channel')
         message_body = notification_map.get('message') if notification_map.get('message') else 'Github Actions Build Information'
@@ -58,7 +58,7 @@ def send_email_notification(message, recipients, email_subject):
         logging.info('No emails addresses configured.')
         return
     msg = MIMEMultipart()
-    email_sender = 'githubactions@kp.org'
+    email_sender = 'githubactions1@kp.org'
     msg['Subject'] = email_subject
     msg['From'] = email_sender
     msg.attach(MIMEText(message, 'html'))
