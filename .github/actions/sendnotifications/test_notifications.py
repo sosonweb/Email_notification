@@ -3,13 +3,13 @@ import pytest
 from unittest.mock import patch, MagicMock
 from your_module_name import send_email_notification  # Replace with your actual module name
 
-# Define a test for the send_email_notification function
+# Test with all environment variables set
 @patch.dict(os.environ, {
     'PROJECT_GIT_REPO': 'test-repo',
     'NOTIFICATION_MAP': '{"email_recipients": ["test@example.com"], "subject": "Test Subject", "message": "Test Message"}',
     'APP_TYPE': 'web',
     'BUILD_URL': 'http://build-url.com',
-    'NOTIFY_FLAGS': '{"send-teams-notification": true}'
+    'NOTIFY_FLAGS': '{"send-teams-notification": true}',
     'LOG_LEVEL': '20'
 })
 @patch('your_module_name.smtplib.SMTP')
