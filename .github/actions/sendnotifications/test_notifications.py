@@ -1,7 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from your_module_name import send_email_notification  # Replace with your actual module name
+from main import send_email_notification
 
 # Define a test for the send_email_notification function
 @patch.dict(os.environ, {
@@ -12,7 +12,7 @@ from your_module_name import send_email_notification  # Replace with your actual
     'NOTIFY_FLAGS': '{"send-teams-notification": true}',
     'LOG_LEVEL': '20'
 })
-@patch('your_module_name.smtplib.SMTP')
+@patch('main.smtplib.SMTP')
 def test_send_email_notification_with_all_vars(mock_smtp):
     # Define test data
     message = "<p>This is a test message</p>"
