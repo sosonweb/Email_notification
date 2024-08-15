@@ -1,47 +1,96 @@
+import os
 import pytest
-import smtplib
 from unittest.mock import patch, MagicMock
-from main import send_email_notification  # Replace with your actual module name
+from your_module_name import send_email_notification  # Replace with your actual module name
 
-# Test case for send_email_notification
-@patch('main.smtplib.SMTP')  # Mock smtplib.SMTP
-# Mock the environment variable NOTIFY_FLAGS
-@patch.dict(os.environ, {"NOTIFY_FLAGS": '{"send-teams-notification": true}'})
-def test_send_email_notification(mock_smtp):
-    # Mock data
+# Define a test for the send_email_notification function
+@patch.dict(os.environ, {
+    'PROJECT_GIT_REPO': 'test-repo',
+    'NOTIFICATION_MAP': '{"email_recipients": ["test@example.com"], "subject": "Test Subject", "message": "Test Message"}',
+    'APP_TYPE': 'web',
+    'BUILD_URL': 'http://build-url.com',
+    'NOTIFY_FLAGS': '{"send-teams-notification": true}',
+    'LOG_LEVEL': '20'
+})
+@patch('your_module_name.smtplib.SMTP')
+def test_send_email_notification_with_all_vars(mock_smtp):
+    # Define test data
     message = "<p>This is a test message</p>"
     recipients = ["test@example.com"]
     email_subject = "Test Subject"
-    
-    # Create a mock SMTP instance
-    mock_smtp_instance = MagicMock()
-    mock_smtp.return_value = mock_smtp_instance
 
-    # Call the function
+    # Mock the SMTP instance to prevent sending real emails
+    mock_smtp_instance = mock_smtp.return_value
+    mock_smtp_instance.sendmail = MagicMock()
+
+    # Call the function under test
     send_email_notification(message, recipients, email_subject)
 
-    # Assert that SMTP was called correctly
+    # Assertions
     mock_smtp.assert_called_once_with('mta.kp.org', 25)
-    
-    # Check that sendmail was called with the correct parameters
     mock_smtp_instance.sendmail.assert_called_once_with(
         from_addr='githubactions@kp.org',
         to_addrs='test@example.com',
         msg=mock_smtp_instance.sendmail.call_args[1]['msg']
     )
-    
-    # Assert that quit was called
     mock_smtp_instance.quit.assert_called_once()
 
-def test_send_email_notification_no_recipients(caplog):
+@patch.dict(os.environ, {
+    'PROJECT_GIT_REPO': 'test-repo',
+    'NOTIFICATION_MAP': '{}',
+    'APP_TYPE': 'web',
+    'BUILD_URL': 'http://build-url.com',
+    'NOTIFY_FLAGS': '{}',
+    'LOG_LEVEL': '20'
+})
+@patch('your_module_name.smtplib.SMTP')
+def test_send_email_notification_no_recipients(mock_smtp):
+    # Define test data
     message = "<p>This is a test message</p>"
-    recipients = []
+    recipients = []  # No recipients
     email_subject = "Test Subject"
 
-    # Call the function
-    with caplog.at_level(logging.INFO):
-        send_email_notification(message, recipients, email_subject)
+    # Mock the SMTP instance to prevent sending real emails
+    mock_smtp_instance = mock_smtp.return_value
+    mock_smtp_instance.sendmail = MagicMock()
 
-    # Assert that the appropriate log message was generated
-    assert 'No emails addresses configured.' in caplog.text
-  
+    # Call the function under test
+    send_email_notification(message, recipients, email_subject)
+
+    # Assertions
+    mock_smtp.assert_not_called()  # No SMTP actions should be performed
+    mock_smtp_instance.quit.assert_not_called()  # No SMTP actions should be performed
+
+@patch.dict(os.environ, {
+    'PROJECT_GIT_REPO': 'test-repo',
+    'NOTIFICATION_MAP': '{"email_recipients": ["test@example.com"], "subject": "Test Subject", "message": "Test Message"}',
+    'APP_TYPE': 'web',
+    'BUILD_URL': 'http://build-url.com',
+    'NOTIFY_FLAGS': '{}',  # Empty notify flags
+    'LOG_LEVEL': '20'
+})
+@patch('your_module_name.smtplib.SMTP')
+def test_send_email_notification_with_empty_notify_flags(mock_smtp):
+    # Define test data
+    message = "<p>This is a test message</p>"
+    recipients = ["test@example.com"]
+    email_subject = "Test Subject"
+
+    # Mock the SMTP instance to prevent sending real emails
+    mock_smtp_instance = mock_smtp.return_value
+    mock_smtp_instance.sendmail = MagicMock()
+
+    # Call the function under test
+    send_email_notification(message, recipients, email_subject)
+
+    # Assertions
+    mock_smtp.assert_called_once_with('mta.kp.org', 25)
+    mock_smtp_instance.sendmail.assert_called_once_with(
+        from_addr='githubactions@kp.org',
+        to_addrs='test@example.com',
+        msg=mock_smtp_instance.sendmail.call_args[1]['msg']
+    )
+    mock_smtp_instance.quit.assert_called_once()
+
+if __name__ == "__main__":
+    pytest.main()
