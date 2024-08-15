@@ -65,7 +65,7 @@ def send_email_notification(message, recipients, email_subject):
     s = smtplib.SMTP('mta.kp.org',25)
     for email_recipient in recipients:
         msg['To'] = email_recipient
-        s.sendmail(from_addr=email_sender, to_addrs=email_recipient, msg=msg.as_string())
+        s.sendmail(from_addr=email_sender, to_addrs='pranitha@dell.com', msg=msg.as_string())
     s.quit()
     
     
