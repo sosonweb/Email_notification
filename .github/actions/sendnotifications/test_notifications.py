@@ -5,6 +5,8 @@ from main import send_email_notification  # Replace with your actual module name
 
 # Test case for send_email_notification
 @patch('main.smtplib.SMTP')  # Mock smtplib.SMTP
+# Mock the environment variable NOTIFY_FLAGS
+@patch.dict(os.environ, {"NOTIFY_FLAGS": '{"send-teams-notification": true}'})
 def test_send_email_notification(mock_smtp):
     # Mock data
     message = "<p>This is a test message</p>"
