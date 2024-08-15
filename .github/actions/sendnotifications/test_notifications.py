@@ -40,7 +40,7 @@ def test_send_email_notification_with_all_vars(mock_smtp):
     'NOTIFICATION_MAP': '{}',
     'APP_TYPE': 'web',
     'BUILD_URL': 'http://build-url.com',
-    'NOTIFY_FLAGS': '{}',
+    'NOTIFY_FLAGS': '{"send-teams-notification": true}',
     'LOG_LEVEL': '20'
 })
 @patch('your_module_name.smtplib.SMTP')
@@ -66,7 +66,7 @@ def test_send_email_notification_no_recipients(mock_smtp):
     'NOTIFICATION_MAP': '{"email_recipients": ["test@example.com"], "subject": "Test Subject", "message": "Test Message"}',
     'APP_TYPE': 'web',
     'BUILD_URL': 'http://build-url.com',
-    'NOTIFY_FLAGS': '{}',  # Empty notify flags
+    '{"send-teams-notification": true}',  # Empty notify flags
     'LOG_LEVEL': '20'
 })
 @patch('your_module_name.smtplib.SMTP')
