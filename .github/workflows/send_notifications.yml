@@ -35,7 +35,7 @@ jobs:
         
     - name: Run tests with pytest
       run: |
-        pytest .github/actions/sendnotification/test_notifications.py --verbose --disable-warnings
+        pytest .github/actions/sendnotifications/test_notifications.py --verbose --disable-warnings
 
     - name: Archive test results
       if: always()
