@@ -75,7 +75,7 @@ def notification_message(message, teams_channel, job_status):
     else:
         logging.info('No teams channel configured.')
         return
-    if job_status == 'success': job_color = '#00cc01'
+    if job_status == 'success': job_color = '#00cc00'
     elif job_status == 'failure': job_color = '#ff0000'
     else: 
         job_color = '#00ff00'
