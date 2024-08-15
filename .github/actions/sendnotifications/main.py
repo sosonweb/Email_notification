@@ -58,7 +58,7 @@ def send_email_notification(message, recipients, email_subject):
         logging.info('No emails addresses configured.')
         return
     msg = MIMEMultipart()
-    email_sender = 'githubactions2@kp.org'
+    email_sender = 'githubactions@kp.org'
     msg['Subject'] = email_subject
     msg['From'] = email_sender
     msg.attach(MIMEText(message, 'html'))
