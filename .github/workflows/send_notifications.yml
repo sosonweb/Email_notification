@@ -1,0 +1,51 @@
+name: Python application
+
+on:
+  push:
+    branches:
+      - master
+      - v1
+  pull_request:
+    branches:
+      - main
+      - v1
+      - Akhilmalakareddy-patch-1
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+        pip install pyyaml requests # If your code uses yaml
+        # Add other dependencies your project requires here
+        
+    - name: Run tests with pytest
+      run: |
+        pytest .github/actions/sendnotification/test_notifications.py --verbose --disable-warnings
+
+    - name: Archive test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: ./test-results/
+
+    - name: Publish test results
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: pytest-results
+        path: pytest_results.xml
