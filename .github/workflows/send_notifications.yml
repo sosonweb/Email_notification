@@ -10,6 +10,7 @@ on:
       - main
       - v1
       - Akhilmalakareddy-patch-1
+      - pranitha_patch
   workflow_dispatch:
 
 jobs:
