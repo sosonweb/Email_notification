@@ -36,7 +36,7 @@ def main():
         message_body += f"<p>Repository Name: {repo_name}<br>Build Status: {job_status}</p><p><a href='{build_url}'>Build link</a></p>"
         message_subject = notification_map.get('subject') if notification_map.get('subject') else 'Github Actions Notification'
         try:
-            # teams webhooks and environment notifications
+            # teams webhooks and environment notification
             if notification_flag['send-teams-notification'] == True:
                 logging.info(f"Notify flag set to true.")
                 if notification_map.get('environment_notifications') == True:
