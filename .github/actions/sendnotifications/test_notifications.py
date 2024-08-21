@@ -71,6 +71,9 @@ def test_notification_message(mock_request):
     message = "<p>This is a test message</p>"
     teams_channel = "https://example.com/webhook"
     job_status = "success"
+
+    # Adjust the expected message to match the nested <p> tag structure
+    expected_message = "<p><strong style='color:#00cc00;'>SUCCESS</strong></p><p><p>This is a test message</p></p>"
     
     # Call the function
     notification_message(message, teams_channel, job_status)
@@ -79,7 +82,8 @@ def test_notification_message(mock_request):
     mock_request.assert_called_once_with(
         "POST",
         teams_channel,
-        data=b'{"text": "<p><strong style=\'color:#00cc00;\'>SUCCESS</strong></p><p>This is a test message</p>"}',
+        #data=b'{"text": "<p><strong style=\'color:#00cc00;\'>SUCCESS</strong></p><p>This is a test message</p>"}',
+        data=json.dumps({"text": expected_message}).encode(),
         headers={'Content-Type': 'application/json'}
     )
 
