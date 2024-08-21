@@ -122,7 +122,7 @@ def test_send_environment_notification(monkeypatch):
             job_status = "success"
             
             # Call the function
-            send_environment_notification(notification_map, job_status)
+            send_environment_notification(notification_map, job_status, 'webapp1')
             
             # Check that notification_message was called correctly
             mock_notification_message.assert_called_once_with(
@@ -154,6 +154,8 @@ def test_send_environment_notification_no_teams_channel(mock_getenv, mock_safe_l
 
     # Check for the specific log entry
     assert any('Error in environment notifications:' in message for message in caplog.messages)
+
+
 
 
 if __name__ == "__main__":
