@@ -100,7 +100,7 @@ def test_notification_message_no_teams_channel(caplog):
 
 @patch.dict(os.environ, {"APP_TYPE": "webapp1"})  # Set APP_TYPE for the duration of this test
 @patch('main.notification_message')  # Mock notification_message
-@patch('main.yaml.safe_load')  # Mock yaml.safe_load
+@patch('main.yaml.safe_load')  # Mock yaml.safe_loa
 def test_send_environment_notification(mock_safe_load, mock_notification_message):
     # Mock the loading of YAML data
     mock_safe_load.return_value = {
