@@ -98,23 +98,6 @@ def test_notification_message_no_teams_channel(caplog):
     # Assert that the appropriate log message was generated
     assert 'No teams channel configured.' in caplog.text
 
-def test_send_environment_notification_no_teams_channel(caplog):
-    # Mock data
-    notification_map = {
-        'environment': 'production',
-        'artifact_name': 'v1.0.0',
-        'message': 'Deployment successful'
-    }
-    job_status = "success"
-
-    # Mock the environment variable to return no teams channel
-    with patch('main.yaml.safe_load', return_value={}):
-        with patch('main.os.getenv', return_value=None):
-            with caplog.at_level(logging.INFO):
-                send_environment_notification(notification_map, job_status)
-
-    # Check for the specific log entry
-    assert any('Error in environment notifications:' in message for message in caplog.messages)
 
 @patch('main.notification_message')  # Mock notification_message
 @patch('main.yaml.safe_load')  # Mock yaml.safe_load
@@ -148,6 +131,32 @@ def test_send_environment_notification(mock_getenv, mock_safe_load, mock_notific
         'https://example.com/webhook',
         'success'
     )
+
+
+@patch('main.yaml.safe_load')
+@patch('main.os.getenv')
+def test_send_environment_notification_no_teams_channel(mock_getenv, mock_safe_load, caplog):
+    # Mock environment variable and data
+    mock_getenv.side_effect = lambda x: {
+        'ENV_NOTIFICATION_MAP': '{}',  # Empty map to simulate no teams channel
+        'APP_TYPE': 'webapp'
+    }[x]
+
+    mock_safe_load.return_value = {}  # Returning an empty map
+
+    notification_map = {
+        'environment': 'production',
+        'artifact_name': 'v1.0.0',
+        'message': 'Deployment successful'
+    }
+    job_status = "success"
+
+    with caplog.at_level(logging.INFO):
+        send_environment_notification(notification_map, job_status)
+
+    # Check for the specific log entry
+    assert any('Error in environment notifications:' in message for message in caplog.messages)
+
 
 if __name__ == "__main__":
     pytest.main()
