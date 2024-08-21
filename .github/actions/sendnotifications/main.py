@@ -95,6 +95,7 @@ def send_environment_notification(notification_map, job_status):
         print("teams channel ...")
         print(app_type)
         print(os.getenv('APP_TYPE'))
+        app_type = os.getenv('APP_TYPE')
         if teams_channel:
             print("here I am ...")
             artifact_version = notification_map.get('artifact_name')
