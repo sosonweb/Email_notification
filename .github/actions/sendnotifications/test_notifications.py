@@ -104,8 +104,8 @@ def test_notification_message_no_teams_channel(caplog):
 def test_send_environment_notification(mock_getenv, mock_safe_load, mock_notification_message):
     # Mock environment variables and data
     mock_getenv.side_effect = lambda x: {
-        'ENV_NOTIFICATION_MAP': '{"webapp": {"production": "https://example.com/webhook"}}',
-        'APP_TYPE': 'webapp'
+        'ENV_NOTIFICATION_MAP': '{"webapp1": {"production": "https://example.com/webhook"}}',
+        'APP_TYPE': 'webapp1'
     }[x]
     
     mock_safe_load.return_value = {
@@ -126,7 +126,7 @@ def test_send_environment_notification(mock_getenv, mock_safe_load, mock_notific
     
     # Check that the notification_message function was called once
     mock_notification_message.assert_called_once_with(
-        "Environment: <b>production</b>, Application Type: <b>webapp</b>, Artifact Version : <b>v1.0.0, Workflow status : <b>success</b>, <b>Deployment successful</b>",
+        "Environment: <b>production</b>, Application Type: <b>webapp1</b>, Artifact Version : <b>v1.0.0, Workflow status : <b>success</b>, <b>Deployment successful</b>",
         'https://example.com/webhook',
         'success'
     )
