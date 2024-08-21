@@ -2,6 +2,7 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 from main import send_email_notification  # Replace with your actual module name
+from main import notification_message
 
 # Define a test for the send_email_notification function
 @patch('main.smtplib.SMTP')
@@ -61,6 +62,37 @@ def test_send_email_notification_no_recipients(mock_smtp):
     # Assertions
     mock_smtp.assert_not_called()  # No SMTP actions should be performed
     mock_smtp_instance.quit.assert_not_called()  # No SMTP actions should be performed
+
+# Test case for notification_message
+@patch('main.requests.request')  # Mock requests.request
+def test_notification_message(mock_request):
+    # Mock data
+    message = "<p>This is a test message</p>"
+    teams_channel = "https://example.com/webhook"
+    job_status = "success"
+    
+    # Call the function
+    notification_message(message, teams_channel, job_status)
+
+    # Assert that requests.request was called correctly
+    mock_request.assert_called_once_with(
+        "POST",
+        teams_channel,
+        data=b'{"text": "<p><strong style=\'color:#00cc00;\'>SUCCESS</strong></p><p>This is a test message</p>"}',
+        headers={'Content-Type': 'application/json'}
+    )
+
+def test_notification_message_no_teams_channel(caplog):
+    message = "<p>This is a test message</p>"
+    teams_channel = None
+    job_status = "success"
+
+    # Call the function
+    with caplog.at_level(logging.INFO):
+        notification_message(message, teams_channel, job_status)
+
+    # Assert that the appropriate log message was generated
+    assert 'No teams channel configured.' in caplog.text
 
 
 if __name__ == "__main__":
