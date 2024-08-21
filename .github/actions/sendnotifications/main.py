@@ -91,6 +91,8 @@ def send_environment_notification(notification_map, job_status):
     try:
         app_type = os.getenv('APP_TYPE')
         deploy_env = notification_map.get('environment')
+        print("hello map here ")
+        print(os.getenv('ENV_NOTIFICATION_MAP'))
         env_notification_map = yaml.safe_load(os.getenv('ENV_NOTIFICATION_MAP'))
         print("env_notification_map ")
         print(env_notification_map)
