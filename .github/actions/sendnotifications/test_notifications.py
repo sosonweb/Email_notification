@@ -107,7 +107,7 @@ def test_send_environment_notification(mock_getenv, mock_safe_load, mock_notific
     mock_getenv.side_effect = lambda x: {
         'ENV_NOTIFICATION_MAP': '{"webapp": {"production": "https://example.com/webhook"}}',
         'APP_TYPE': 'webapp'
-    }[x]
+    }.get(key, None)
     
     mock_safe_load.return_value = {
         'webapp': {
@@ -119,7 +119,8 @@ def test_send_environment_notification(mock_getenv, mock_safe_load, mock_notific
         'environment': 'production',
         'artifact_name': 'v1.0.0',
         'message': 'Deployment successful'
-    }
+    }.get(arg, None)
+    
     job_status = "success"
     
     # Call the function
