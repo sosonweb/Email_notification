@@ -15,7 +15,7 @@ import logging,json
 })
 def test_send_email_notification_with_all_vars(mock_smtp):
     #print(os.environ)
-    # Define test data
+    # Define test dat
     message = "<p>This is a test message</p>"
     recipients = ["test@example.com"]
     email_subject = "Test Subject"
