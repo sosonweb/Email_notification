@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from main import send_email_notification  # Replace with your actual module name
 from main import notification_message
+import logging
 
 # Define a test for the send_email_notification function
 @patch('main.smtplib.SMTP')
