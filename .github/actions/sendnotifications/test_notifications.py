@@ -99,5 +99,58 @@ def test_notification_message_no_teams_channel(caplog):
     assert 'No teams channel configured.' in caplog.text
 
 
+# Test case for send_environment_notification
+@patch('main.notification_message')  # Mock notification_message
+@patch('main.yaml.safe_load')  # Mock yaml.safe_load
+@patch('main.os.getenv')  # Mock os.getenv
+def test_send_environment_notification(mock_getenv, mock_safe_load, mock_notification_message):
+    # Mock environment variables and data
+    mock_getenv.side_effect = lambda x: {
+        'ENV_NOTIFICATION_MAP': '{"webapp": {"production": "https://example.com/webhook"}}',
+        'APP_TYPE': 'webapp'
+    }[x]
+    
+    mock_safe_load.return_value = {
+        'webapp': {
+            'production': 'https://example.com/webhook'
+        }
+    }
+    
+    notification_map = {
+        'environment': 'production',
+        'artifact_name': 'v1.0.0',
+        'message': 'Deployment successful'
+    }
+    job_status = "success"
+
+    # Call the function
+    send_environment_notification(notification_map, job_status)
+
+    # Assert that notification_message was called correctly
+    mock_notification_message.assert_called_once_with(
+        "Environment: <b>production</b>, Application Type: <b>webapp</b>, Artifact Version : <b>v1.0.0, Workflow status : <b>success</b>, <b>Deployment successful</b>",
+        'https://example.com/webhook',
+        'success'
+    )
+
+def test_send_environment_notification_no_teams_channel(caplog):
+    # Mock data
+    notification_map = {
+        'environment': 'production',
+        'artifact_name': 'v1.0.0',
+        'message': 'Deployment successful'
+    }
+    job_status = "success"
+
+    # Mock the environment variable to return no teams channel
+    with patch('main.yaml.safe_load', return_value={}):
+        with patch('main.os.getenv', return_value=None):
+            with caplog.at_level(logging.INFO):
+                send_environment_notification(notification_map, job_status)
+
+    # Assert that the appropriate log message was generated
+    assert 'Error in environment notifications:' in caplog.text
+
+
 if __name__ == "__main__":
     pytest.main()
