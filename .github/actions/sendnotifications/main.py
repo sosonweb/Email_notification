@@ -49,7 +49,7 @@ def main():
         except Exception as e:
             logging.error(f'Error in send notification: {e}')
             
-
+# hello
 def send_email_notification(message, recipients, email_subject):
     if recipients and len(recipients) > 0:
         # logging.info(type(recipients))
