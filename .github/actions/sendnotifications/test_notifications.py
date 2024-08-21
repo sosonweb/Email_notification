@@ -1,8 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from main import send_email_notification  # Replace with your actual module name
-from main import notification_message
+from main import send_email_notification,notification_message, send_environment_notification
 import logging,json
 
 # Define a test for the send_email_notification function
