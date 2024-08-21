@@ -98,13 +98,13 @@ def test_notification_message_no_teams_channel(caplog):
     # Assert that the appropriate log message was generated
     assert 'No teams channel configured.' in caplog.text
 
-@patch.dict(os.environ, {"APP_TYPE": "webapp"})  # Set APP_TYPE for the duration of this test
+@patch.dict(os.environ, {"APP_TYPE": "webapp1"})  # Set APP_TYPE for the duration of this test
 @patch('main.notification_message')  # Mock notification_message
 @patch('main.yaml.safe_load')  # Mock yaml.safe_load
 def test_send_environment_notification(mock_safe_load, mock_notification_message):
     # Mock the loading of YAML data
     mock_safe_load.return_value = {
-        'webapp': {
+        'webapp1': {
             'production': 'https://example.com/webhook'
         }
     }
@@ -121,7 +121,7 @@ def test_send_environment_notification(mock_safe_load, mock_notification_message
     
     # Check that notification_message was called correctly
     mock_notification_message.assert_called_once_with(
-        "Environment: <b>production</b>, Application Type: <b>webapp</b>, Artifact Version : <b>v1.0.0, Workflow status : <b>success</b>, <b>Deployment successful</b>",
+        "Environment: <b>production</b>, Application Type: <b>webapp1</b>, Artifact Version : <b>v1.0.0, Workflow status : <b>success</b>, <b>Deployment successful</b>",
         'https://example.com/webhook',
         'success'
     )
