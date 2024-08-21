@@ -42,3 +42,22 @@ def test_get_env_unexpected_url(monkeypatch):
     
     # Call the function and check if it returns 'production' (default case)
     assert get_env() == 'production'
+
+import pytest
+from main import get_env  # Replace with the actual module name if different
+
+@pytest.mark.parametrize("git_url, expected_env", [
+    ("https://sandbox.example.com/repo", "sandbox"),
+    ("http://localhost:8000/repo", "local"),
+    ("https://staging.example.com/repo", "staging"),
+    ("https://production.example.com/repo", "production"),
+    ("https://unknown.example.com/repo", "production"),  # Default case
+])
+def test_get_env(monkeypatch, git_url, expected_env):
+    # Use monkeypatch to set the GITHUB_SERVER_URL environment variable
+    monkeypatch.setenv('GITHUB_SERVER_URL', git_url)
+    
+    # Call the function and assert the expected environment is returned
+    assert get_env() == expected_env
+
+
