@@ -98,44 +98,38 @@ def test_notification_message_no_teams_channel(caplog):
     # Assert that the appropriate log message was generated
     assert 'No teams channel configured.' in caplog.text
 
-@patch('main.notification_message')  # Mock notification_message
-@patch('main.yaml.safe_load')  # Mock yaml.safe_load
-@patch('main.os.getenv')  # Mock os.getenv
-def test_send_environment_notification(mock_getenv, mock_safe_load, mock_notification_message):
-    # Mock environment variables and data
-    mock_getenv.side_effect = lambda x: {
-        'ENV_NOTIFICATION_MAP': '{"webapp1": {"production": "https://example.com/webhook1"}}',
-        'APP_TYPE': 'webapp1'
-    }.get(x, None)
+def test_send_environment_notification(monkeypatch):
     
-    # Mock yaml.safe_load to return the parsed dictionary
-    def safe_load_side_effect(arg):
-        if arg == '{"webapp1": {"production": "https://example.com/webhook1"}}':
-            return {
-                'webapp1': {
-                    'production': 'https://example.com/webhook1'
-                }
+    # Use monkeypatch to set environment variables
+    monkeypatch.setenv('APP_TYPE', 'webapp1')
+    monkeypatch.setenv('ENV_NOTIFICATION_MAP', '{"webapp1": {"production": "https://example.com/webhook1"}}')
+    
+    # Mock yaml.safe_load to correctly parse the ENV_NOTIFICATION_MAP
+    with patch('main.yaml.safe_load') as mock_safe_load:
+        mock_safe_load.side_effect = lambda x: {
+            'webapp1': {
+                'production': 'https://example.com/webhook1'
             }
-        return {}
-
-    mock_safe_load.side_effect = safe_load_side_effect
-    
-    notification_map = {
-        'environment': 'production',
-        'artifact_name': 'v1.0.0',
-        'message': 'Deployment successful'
-    }
-    job_status = "success"
-    
-    # Call the function
-    send_environment_notification(notification_map, job_status)
-    
-    # Check that the notification_message function was called once
-    mock_notification_message.assert_called_once_with(
-        "Environment: <b>production</b>, Application Type: <b>webapp1</b>, Artifact Version : <b>v1.0.0, Workflow status : <b>success</b>, <b>Deployment successful</b>",
-        'https://example.com/webhook1',
-        'success'
-    )
+        } if x == '{"webapp1": {"production": "https://example.com/webhook1"}}' else {}
+        
+        # Mock the notification_message function
+        with patch('main.notification_message') as mock_notification_message:
+            notification_map = {
+                'environment': 'production',
+                'artifact_name': 'v1.0.0',
+                'message': 'Deployment successful'
+            }
+            job_status = "success"
+            
+            # Call the function
+            send_environment_notification(notification_map, job_status)
+            
+            # Check that notification_message was called correctly
+            mock_notification_message.assert_called_once_with(
+                "Environment: <b>production</b>, Application Type: <b>webapp1</b>, Artifact Version : <b>v1.0.0, Workflow status : <b>success</b>, <b>Deployment successful</b>",
+                'https://example.com/webhook1',
+                'success'
+            )
 
 @patch('main.yaml.safe_load')
 @patch('main.os.getenv')
