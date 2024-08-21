@@ -98,17 +98,11 @@ def test_notification_message_no_teams_channel(caplog):
     # Assert that the appropriate log message was generated
     assert 'No teams channel configured.' in caplog.text
 
-
+@patch.dict(os.environ, {"APP_TYPE": "webapp"})  # Set APP_TYPE for the duration of this test
 @patch('main.notification_message')  # Mock notification_message
 @patch('main.yaml.safe_load')  # Mock yaml.safe_load
-@patch('main.os.getenv')  # Mock os.getenv
 def test_send_environment_notification(mock_getenv, mock_safe_load, mock_notification_message):
-    # Mock environment variables and data
-    mock_getenv.side_effect = lambda x: {
-        'ENV_NOTIFICATION_MAP': '{"webapp": {"production": "https://example.com/webhook"}}',
-        'APP_TYPE': 'webapp'
-    }.get(key, None)
-    
+# Mock the loading of YAML data
     mock_safe_load.return_value = {
         'webapp': {
             'production': 'https://example.com/webhook'
@@ -120,19 +114,17 @@ def test_send_environment_notification(mock_getenv, mock_safe_load, mock_notific
         'artifact_name': 'v1.0.0',
         'message': 'Deployment successful'
     }
-    
     job_status = "success"
     
     # Call the function
     send_environment_notification(notification_map, job_status)
     
-    # Check that the notification_message function was called once
+    # Check that notification_message was called correctly
     mock_notification_message.assert_called_once_with(
         "Environment: <b>production</b>, Application Type: <b>webapp</b>, Artifact Version : <b>v1.0.0, Workflow status : <b>success</b>, <b>Deployment successful</b>",
         'https://example.com/webhook',
         'success'
     )
-
 
 @patch('main.yaml.safe_load')
 @patch('main.os.getenv')
