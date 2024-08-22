@@ -134,7 +134,7 @@ def test_send_environment_notification(monkeypatch):
                 'https://example.com/webhook1',
                 'success'
             )
-'''
+
 
 @patch('main.yaml.safe_load')
 @patch('main.os.getenv')
@@ -160,6 +160,8 @@ def test_send_environment_notification_no_teams_channel(mock_getenv, mock_safe_l
     # Check for the specific log entry
     assert any('Error in environment notifications:' in message for message in caplog.messages)
 
+    
+'''
 def test_send_environment_notification_success(monkeypatch):
     # Setting environment variables using monkeypatch
     env_notification_map = {
@@ -188,6 +190,50 @@ def test_send_environment_notification_success(monkeypatch):
             "Artifact Version : <b>v1.2.3, Workflow status : <b>Success</b>, <b>Deployment successful!</b>"
         )
         mock_notification_message.assert_called_once_with(expected_message, 'teams-channel-id-prod', 'Success')
+
+def test_send_environment_notification_no_channel(monkeypatch):
+    # Setting environment variables using monkeypatch with no matching channel
+    env_notification_map = {
+        'app_type': {
+            'staging': 'teams-channel-id-staging'
+        }
+    }
+    monkeypatch.setenv('ENV_NOTIFICATION_MAP', yaml.dump(env_notification_map))
+    monkeypatch.setenv('APP_TYPE', 'app_type')
+
+    notification_map = {
+        'environment': 'production',
+        'artifact_name': 'v1.2.3',
+        'message': 'Deployment successful!'
+    }
+    job_status = 'Success'
+
+    # Mocking the notification_message function
+    with mock.patch('main.notification_message') as mock_notification_message:
+        send_environment_notification(notification_map, job_status, 'app_type')
+
+        # Asserting that notification_message was not called since no teams_channel was found
+        mock_notification_message.assert_not_called()
+
+def test_send_environment_notification_exception_handling(monkeypatch):
+    # Setting environment variables using monkeypatch with invalid YAML to trigger an exception
+    monkeypatch.setenv('ENV_NOTIFICATION_MAP', 'invalid_yaml')
+    monkeypatch.setenv('APP_TYPE', 'app_type')
+
+    notification_map = {
+        'environment': 'production',
+        'artifact_name': 'v1.2.3',
+        'message': 'Deployment successful!'
+    }
+    job_status = 'Failed'
+
+    # Mocking the logging.info function
+    with mock.patch('main.logging.info') as mock_logging_info:
+        send_environment_notification(notification_map, job_status, 'app_type')
+
+        # Asserting that logging.info was called due to the exception
+        mock_logging_info.assert_called_once()
+        assert "Error in environment notifications:" in mock_logging_info.call_args[0][0]
 
 
 if __name__ == "__main__":
