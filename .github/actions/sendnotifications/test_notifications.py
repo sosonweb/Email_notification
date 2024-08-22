@@ -6,7 +6,7 @@ import logging,json
 import yaml
 from unittest import mock
 
-# Define a test for the send_email_notification function
+# Define a test for the send_email_notifications function
 @patch('main.smtplib.SMTP')
 @patch.dict(os.environ, {
     'PROJECT_GIT_REPO': 'test-repo',
