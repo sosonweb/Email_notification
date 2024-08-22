@@ -182,7 +182,7 @@ def test_send_environment_notification_success(monkeypatch):
 
     # Mocking the notification_message function
     with mock.patch('main.notification_message') as mock_notification_message:
-        send_environment_notification(notification_map, job_status, 'app_type')
+        send_environment_notification(notification_map, job_status)
 
         # Asserting that notification_message was called with the correct parameters
         expected_message = (
@@ -210,7 +210,7 @@ def test_send_environment_notification_no_channel(monkeypatch):
 
     # Mocking the notification_message function
     with mock.patch('main.notification_message') as mock_notification_message:
-        send_environment_notification(notification_map, job_status, 'app_type')
+        send_environment_notification(notification_map, job_status)
 
         # Asserting that notification_message was not called since no teams_channel was found
         mock_notification_message.assert_not_called()
@@ -229,12 +229,11 @@ def test_send_environment_notification_exception_handling(monkeypatch):
 
     # Mocking the logging.info function
     with mock.patch('main.logging.info') as mock_logging_info:
-        send_environment_notification(notification_map, job_status, 'app_type')
+        send_environment_notification(notification_map, job_status)
 
         # Asserting that logging.info was called due to the exception
         mock_logging_info.assert_called_once()
         assert "Error in environment notifications:" in mock_logging_info.call_args[0][0]
-
 
 if __name__ == "__main__":
     pytest.main()
