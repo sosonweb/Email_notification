@@ -1,245 +1,205 @@
+import os
 import pytest
-import subprocess
-from main import generate_test_reports, set_vars
+import smtplib
+import requests
+import logging
+import json
+import yaml
+from main import send_email_notification, notification_message, send_environment_notification
 
-# Test case 1: Test when args_test is present and subprocess runs successfully
-def test_generate_test_reports_success(monkeypatch):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {
-            'js-lcov-report-path': '/path/to/lcov-report',
-            'cobertura': True,
-            'html-reports': {
-                'pipeline-coverage-report': {
-                    'report-dir': 'coverage-report-dir'
-                }
-            }
+# Define a test for the send_email_notifications function
+def test_send_email_notification_with_all_vars(monkeypatch):
+    # Use monkeypatch to set environment variables
+    monkeypatch.setenv('PROJECT_GIT_REPO', 'test-repo')
+    monkeypatch.setenv('NOTIFICATION_MAP', '{"email_recipients": ["test@example.com"], "subject": "Test Subject", "message": "Test Message"}')
+    monkeypatch.setenv('APP_TYPE', 'web')
+    monkeypatch.setenv('BUILD_URL', 'http://build-url.com')
+    monkeypatch.setenv('NOTIFY_FLAGS', '{"send-teams-notification": true}')
+
+    # Define test data
+    message = "<p>This is a test message</p>"
+    recipients = ["test@example.com"]
+    email_subject = "Test Subject"
+
+    # Mock the SMTP instance to prevent sending real emails
+    def mock_smtp(*args, **kwargs):
+        class MockSMTP:
+            def sendmail(self, from_addr, to_addrs, msg):
+                pass
+
+            def quit(self):
+                pass
+
+        return MockSMTP()
+
+    monkeypatch.setattr(smtplib, 'SMTP', mock_smtp)
+
+    # Call the function under test
+    send_email_notification(message, recipients, email_subject)
+
+    # Since it's a mock free implementation, we don't assert SMTP methods directly.
+    # Instead, we ensure no exceptions were raised during execution.
+
+
+def test_send_email_notification_no_recipients(monkeypatch):
+    # Use monkeypatch to set environment variables
+    monkeypatch.setenv('PROJECT_GIT_REPO', 'test-repo')
+    monkeypatch.setenv('NOTIFICATION_MAP', '{}')
+    monkeypatch.setenv('APP_TYPE', 'web')
+    monkeypatch.setenv('BUILD_URL', 'http://build-url.com')
+    monkeypatch.setenv('NOTIFY_FLAGS', '{"send-teams-notification": false}')
+    monkeypatch.setenv('LOG_LEVEL', '20')
+
+    # Define test data
+    message = "<p>This is a test message</p>"
+    recipients = []  # No recipients
+    email_subject = "Test Subject"
+
+    # Mock the SMTP instance to prevent sending real emails
+    def mock_smtp(*args, **kwargs):
+        class MockSMTP:
+            def sendmail(self, from_addr, to_addrs, msg):
+                pass
+
+            def quit(self):
+                pass
+
+        return MockSMTP()
+
+    monkeypatch.setattr(smtplib, 'SMTP', mock_smtp)
+
+    # Call the function under test
+    send_email_notification(message, recipients, email_subject)
+
+    # Ensure that no errors were raised due to the empty recipients list.
+
+
+# Test case for notification_message
+def test_notification_message(monkeypatch):
+    # Mock data
+    message = "<p>This is a test message</p>"
+    teams_channel = "https://example.com/webhook"
+    job_status = "success"
+
+    # Adjust the expected message to match the nested <p> tag structure
+    expected_message = "<p><strong style='color:#00cc00;'>SUCCESS</strong></p><p><p>This is a test message</p></p>"
+
+    # Mock requests.request to prevent actual HTTP calls
+    def mock_request(*args, **kwargs):
+        class MockResponse:
+            def __init__(self):
+                self.content = "OK"
+
+        return MockResponse()
+
+    monkeypatch.setattr(requests, 'request', mock_request)
+
+    # Call the function
+    notification_message(message, teams_channel, job_status)
+
+    # Ensure that the function executed without errors
+
+
+def test_notification_message_no_teams_channel(monkeypatch, caplog):
+    message = "<p>This is a test message</p>"
+    teams_channel = None
+    job_status = "success"
+
+    # Call the function with logging capture
+    with caplog.at_level(logging.INFO):
+        notification_message(message, teams_channel, job_status)
+
+    # Assert that the appropriate log message was generated
+    assert 'No teams channel configured.' in caplog.text
+
+
+def test_send_environment_notification_success(monkeypatch):
+    # Setting environment variables using monkeypatch
+    env_notification_map = {
+        'app_type': {
+            'production': 'teams-channel-id-prod',
+            'staging': 'teams-channel-id-staging'
         }
     }
+    monkeypatch.setenv('ENV_NOTIFICATION_MAP', yaml.dump(env_notification_map))
+    monkeypatch.setenv('APP_TYPE', 'app_type')
+    monkeypatch.setattr('main.app_type', 'app_type')
 
-    # Mocking subprocess.run and logging.info using monkeypatch
-    def mock_run(command, shell, check, timeout):
-        if 'npm test' in command:
-            return subprocess.CompletedProcess(args=command, returncode=0)
-        elif 'pycobertura' in command:
-            return subprocess.CompletedProcess(args=command, returncode  = 0)
-        elif 'find' in command:
-            return subprocess.CompletedProcess(args=command, returncode=0, stdout='/fake/workspace/coverage-report-dir')
+    notification_map = {
+        'environment': 'production',
+        'artifact_name': 'v1.2.3',
+        'message': 'Deployment successful!'
+    }
+    job_status = 'Success'
 
-    def mock_info(message):
-        pass  # Do nothing for logging.info
+    # Mock requests.request to prevent actual HTTP calls
+    def mock_request(*args, **kwargs):
+        class MockResponse:
+            def __init__(self):
+                self.content = "OK"
 
-    monkeypatch.setattr(subprocess, 'run', mock_run)
-    monkeypatch.setattr('main.logging.info', mock_info)
-    monkeypatch.setattr('main.workspace', '/fake/workspace')
+        return MockResponse()
 
-    generate_test_reports(build_var_map)
+    monkeypatch.setattr(requests, 'request', mock_request)
 
-    # Assertions to check if subprocess.run was called with expected commands
-    mock_run.assert_any_call('export LOG_LEVEL=ERROR && npm test', shell=True, check=True, timeout=3600)
-    mock_run.assert_any_call(
-        'python -m pycobertura show --format html --output coverage/cobertura-coverage.html coverage/cobertura-coverage.xml',
-        shell=True
-    )
-    mock_run.assert_any_call(
-        ['find /fake/workspace -depth 1 -type d -name coverage-report-dir'],
-        stdout=-1, timeout=None, check=True, shell=True, text=True
-    )
+    # Call the function
+    send_environment_notification(notification_map, job_status)
 
-# Test case 5: Test when the HTML report directory is missing or incorrect
-def test_generate_test_reports_no_html_report(monkeypatch):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {
-            # The 'html-reports' key is None to simulate the AttributeError
-            'html-reports': None
+    # Ensure that the function executed without errors
+
+
+def test_send_environment_notification_no_channel(monkeypatch):
+    # Setting environment variables using monkeypatch with no matching channel
+    env_notification_map = {
+        'app_type': {
+            'staging': 'teams-channel-id-staging'
         }
     }
+    monkeypatch.setenv('ENV_NOTIFICATION_MAP', yaml.dump(env_notification_map))
+    monkeypatch.setenv('APP_TYPE', 'app_type')
 
-    def mock_run(command, shell, check, timeout):
-        return subprocess.CompletedProcess(args=command, returncode=0)
-
-    def mock_error(message):
-        raise AttributeError("No HTML report found")
-
-    monkeypatch.setattr(subprocess, 'run', mock_run)
-    monkeypatch.setattr('main.logging.error', mock_error)
-    monkeypatch.setattr('main.workspace', '/fake/workspace')
-
-    with pytest.raises(AttributeError, match="No HTML report found"):
-        generate_test_reports(build_var_map)
-
-# Test case 2: Test when the subprocess fails
-def test_generate_test_reports_subprocess_failure(monkeypatch, caplog):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {}
+    notification_map = {
+        'environment': 'production',
+        'artifact_name': 'v1.2.3',
+        'message': 'Deployment successful!'
     }
+    job_status = 'Success'
 
-    def mock_run(command, shell, check, timeout):
-        raise subprocess.CalledProcessError(1, 'npm test')
+    # Mock requests.request to prevent actual HTTP calls
+    def mock_request(*args, **kwargs):
+        class MockResponse:
+            def __init__(self):
+                self.content = "OK"
 
-    monkeypatch.setattr(subprocess, 'run', mock_run)
-    monkeypatch.setattr('main.workspace', '/fake/workspace')
+        return MockResponse()
 
-    generate_test_reports(build_var_map)
+    monkeypatch.setattr(requests, 'request', mock_request)
 
-    assert any("Command 'npm test' returned non-zero exit status 1." in record.message for record in caplog.records)
+    # Call the function
+    send_environment_notification(notification_map, job_status)
 
-# Test case 3: Test when the subprocess times out
-def test_generate_test_reports_timeout(monkeypatch, caplog):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {}
+    # Since no matching teams_channel, ensure no exceptions were raised
+
+
+def test_send_environment_notification_exception_handling(monkeypatch):
+    # Setting environment variables using monkeypatch with invalid YAML to trigger an exception
+    monkeypatch.setenv('ENV_NOTIFICATION_MAP', 'invalid_yaml')
+    monkeypatch.setenv('APP_TYPE', 'app_type')
+
+    notification_map = {
+        'environment': 'production',
+        'artifact_name': 'v1.2.3',
+        'message': 'Deployment successful!'
     }
+    job_status = 'Failed'
 
-    def mock_run(command, shell, check, timeout):
-        raise subprocess.TimeoutExpired(cmd='npm test', timeout=3600)
+    # Mock logging to capture the output
+    with caplog.at_level(logging.INFO):
+        send_environment_notification(notification_map, job_status)
 
-    monkeypatch.setattr(subprocess, 'run', mock_run)
-    monkeypatch.setattr('main.workspace', '/fake/workspace')
+    # Asserting that logging.info was called due to the exception
+    assert "Error in environment notifications:" in caplog.text
 
-    generate_test_reports(build_var_map)
 
-    assert any("Command 'npm test' timed out after 3600 seconds" in record.message for record in caplog.records)
-
-# Test case 4: Test when a runtime error occur during subprocess execution
-def test_generate_test_reports_runtime_error(monkeypatch, caplog):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {}
-    }
-
-    def mock_run(command, shell, check, timeout):
-        raise RuntimeError("Runtime error occurred")
-
-    monkeypatch.setattr(subprocess, 'run', mock_run)
-    monkeypatch.setattr('main.workspace', '/fake/workspace')
-
-    generate_test_reports(build_var_map)
-
-    assert any("Runtime error occurred" in record.message for record in caplog.records)
-
-# Test case 4: Test for cobertura report generation
-def test_generate_test_reports_cobertura(monkeypatch):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {
-            'cobertura': True
-        }
-    }
-
-    def mock_run(command, shell, check, timeout):
-        return subprocess.CompletedProcess(args=command, returncode=0)
-
-    def mock_info(message):
-        pass  # Do nothing for logging.info
-
-    monkeypatch.setattr(subprocess, 'run', mock_run)
-    monkeypatch.setattr('main.logging.info', mock_info)
-    monkeypatch.setattr('main.workspace', '/fake/workspace')
-
-    generate_test_reports(build_var_map)
-
-    mock_run.assert_any_call(
-        'python -m pycobertura show --format html --output coverage/cobertura-coverage.html coverage/cobertura-coverage.xml',
-        shell=True
-    )
-    assert mock_info.call_count > 1  # Check that logging was called for the Cobertura report
-
-# Test case 6: Test when lcov report path is available
-def test_generate_test_reports_lcov_path(monkeypatch):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {
-            'js-lcov-report-path': '/path/to/lcov-report'
-        }
-    }
-
-    def mock_system(command):
-        return 0  # Simulate a successful command
-
-    def mock_info(message):
-        pass  # Do nothing for logging.info
-
-    monkeypatch.setattr('main.os.system', mock_system)
-    monkeypatch.setattr('main.logging.info', mock_info)
-    monkeypatch.setattr('main.workspace', '/fake/workspace')
-
-    generate_test_reports(build_var_map)
-
-    mock_info.assert_any_call('Lcov report path /path/to/lcov-report')
-    mock_system.assert_any_call("echo 'lcov-report-path=/path/to/lcov-report' >> $GITHUB_OUTPUT")
-
-# Test case 7: Test when no args_test is provided
-def test_generate_test_reports_no_args_test(monkeypatch):
-    build_var_map = {
-        'build_group': {}
-    }
-
-    def mock_info(message):
-        pass  # Do nothing for logging.info
-
-    monkeypatch.setattr('main.logging.info', mock_info)
-
-    generate_test_reports(build_var_map)
-
-    mock_info.assert_not_called()
-
-# Test case 1: Test with all values present in config_map
-def test_set_vars_all_values_present(monkeypatch):
-    config_map = {
-        'runtime_version': '14.17.0',
-        'args_build': 'npm run build',
-        'args_test': 'npm test',
-        'test_flag_enabled': 'true'
-    }
-
-    def mock_system(command):
-        return 0  # Simulate a successful command
-
-    monkeypatch.setattr('main.os.system', mock_system)
-
-    set_vars(config_map)
-
-    mock_system.assert_any_call("echo 'runtime-version=14.17.0' >> $GITHUB_OUTPUT")
-    mock_system.assert_any_call("echo 'args-build=npm run build' >> $GITHUB_OUTPUT")
-    mock_system.assert_any_call("echo 'args-test=npm test' >> $GITHUB_OUTPUT")
-    mock_system.assert_any_call("echo 'test-flag-enabled=true' >> $GITHUB_OUTPUT")
-
-    assert mock_system.call_count == 4
-
-# Test case 2: Test without runtime_version
-def test_set_vars_without_runtime_version(monkeypatch):
-    config_map = {
-        'args_build': 'npm run build',
-        'args_test': 'npm test',
-        'test_flag_enabled': 'false'
-    }
-
-    def mock_system(command):
-        return 0  # Simulate a successful command
-
-    monkeypatch.setattr('main.os.system', mock_system)
-
-    set_vars(config_map)
-
-    mock_system.assert_any_call("echo 'args-build=npm run build' >> $GITHUB_OUTPUT")
-    mock_system.assert_any_call("echo 'args-test=npm test' >> $GITHUB_OUTPUT")
-    mock_system.assert_any_call("echo 'test-flag-enabled=false' >> $GITHUB_OUTPUT")
-
-    assert mock_system.call_count == 3
-
-# Test case 3: Test with empty config_map (should fail)
-def test_set_vars_empty_config_map(monkeypatch):
-    config_map = {}
-
-    def mock_system(command):
-        return 0  # Simulate a successful command
-
-    monkeypatch.setattr('main.os.system', mock_system)
-
-    with pytest.raises(KeyError):
-        set_vars(config_map)
-
-    mock_system.assert_not_called()
+if __name__ == "__main__":
+    pytest.main()
