@@ -207,3 +207,23 @@ def test_set_vars_empty_config_map(mock_os_system):
 
     # Ensure that no os.system calls were made
     mock_os_system.assert_not_called()
+
+
+import subprocess
+import pytest
+from unittest import mock
+from main import generate_test_reports
+
+@mock.patch('main.subprocess.run', side_effect=subprocess.CalledProcessError(1, 'npm test'))
+def test_generate_test_reports_subprocess_failure(mock_run, caplog):
+    build_var_map = {
+        'args_test': 'npm test',
+        'build_group': {}
+    }
+
+    with mock.patch('main.workspace', '/fake/workspace'):
+        generate_test_reports(build_var_map)
+
+    # Verify that the error was logged
+    assert any("Command 'npm test' returned non-zero exit status 1." in record.message for record in caplog.records)
+
