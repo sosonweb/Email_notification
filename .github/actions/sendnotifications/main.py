@@ -87,10 +87,9 @@ def notification_message(message, teams_channel, job_status):
     logging.debug(f"{post_webhook.content}") 
 
 
-def send_environment_notification(notification_map, job_status, app_type1):
+def send_environment_notification(notification_map, job_status):
     try:
         app_type = os.getenv('APP_TYPE')
-        app_type = app_type1
         deploy_env = notification_map.get('environment')
         print("hello map here ")
         print(os.getenv('ENV_NOTIFICATION_MAP'))
