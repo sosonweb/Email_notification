@@ -89,20 +89,10 @@ def notification_message(message, teams_channel, job_status):
 
 def send_environment_notification(notification_map, job_status):
     try:
-        app_type = os.getenv('APP_TYPE')
         deploy_env = notification_map.get('environment')
-        print("hello map here ")
-        print(os.getenv('ENV_NOTIFICATION_MAP'))
         env_notification_map = yaml.safe_load(os.getenv('ENV_NOTIFICATION_MAP'))
-        print("env_notification_map ")
-        print(env_notification_map)
         teams_channel = env_notification_map.get(app_type).get(deploy_env) if env_notification_map.get(app_type) else None
-        print("teams channel ...")
-        print(teams_channel)
-        print(app_type)
-        print(os.getenv('APP_TYPE'))
         if teams_channel:
-            print("here I am ...")
             artifact_version = notification_map.get('artifact_name')
             custom_message = notification_map.get('message') if notification_map.get('message') else ""
             message = f"Environment: <b>{deploy_env}</b>, Application Type: <b>{app_type}</b>, Artifact Version : <b>{artifact_version}, Workflow status : <b>{job_status}</b>, <b>{custom_message}</b>"
