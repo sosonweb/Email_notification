@@ -6,7 +6,7 @@ import logging
 import json
 import yaml
 
-# Define a test for the send_email_notification function
+# Define a test for the send_email_notifications function
 def test_send_email_notification_with_all_vars(monkeypatch):
     # Use monkeypatch to set environment variables
     monkeypatch.setenv('PROJECT_GIT_REPO', 'test-repo')
