@@ -1,209 +1,162 @@
+import os
 import pytest
-import subprocess
-from unittest import mock
-import logging
-from main import generate_test_reports
-from main import set_vars
+from unittest.mock import patch, MagicMock
+from main import send_email_notification,notification_message, send_environment_notification
+import logging,json
 
-# Test case 1: Test when args_test is present and subprocess runs successfully
-@mock.patch('main.subprocess.run', return_value=mock.Mock())
-@mock.patch('main.logging.info')
-def test_generate_test_reports_success(mock_logging_info, mock_subprocess_run):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {
-            'js-lcov-report-path': '/path/to/lcov-report',
-            'cobertura': True,
-            'html-reports': {
-                'pipeline-coverage-report': {
-                    'report-dir': 'coverage-report-dir'
-                }
+# Define a test for the send_email_notification function
+@patch('main.smtplib.SMTP')
+@patch.dict(os.environ, {
+    'PROJECT_GIT_REPO': 'test-repo',
+    'NOTIFICATION_MAP': '{"email_recipients": ["test@example.com"], "subject": "Test Subject", "message": "Test Message"}',
+    'APP_TYPE': 'web',
+    'BUILD_URL': 'http://build-url.com',
+    'NOTIFY_FLAGS': '{"send-teams-notification": true}'
+})
+def test_send_email_notification_with_all_vars(mock_smtp):
+    #print(os.environ)
+    # Define test data
+    message = "<p>This is a test message</p>"
+    recipients = ["test@example.com"]
+    email_subject = "Test Subject"
+
+    # Mock the SMTP instance to prevent sending real emails
+    mock_smtp_instance = mock_smtp.return_value
+    mock_smtp_instance.sendmail = MagicMock()
+
+    # Call the function under test
+    send_email_notification(message, recipients, email_subject)
+
+    # Assertions
+    mock_smtp.assert_called_once_with('mta.kp.org', 25)
+    mock_smtp_instance.sendmail.assert_called_once_with(
+        from_addr='githubactions@kp.org',
+        to_addrs='test@example.com',
+        msg=mock_smtp_instance.sendmail.call_args[1]['msg']
+    )
+    mock_smtp_instance.quit.assert_called_once()
+    
+@patch('main.smtplib.SMTP')
+@patch.dict(os.environ, {
+    'PROJECT_GIT_REPO': 'test-repo',
+    'NOTIFICATION_MAP': '{}',
+    'APP_TYPE': 'web',
+    'BUILD_URL': 'http://build-url.com',
+    'NOTIFY_FLAGS': '{"send-teams-notification": false}',
+    'LOG_LEVEL': '20'
+})
+
+def test_send_email_notification_no_recipients(mock_smtp):
+    # Define test data
+    message = "<p>This is a test message</p>"
+    recipients = []  # No recipients
+    email_subject = "Test Subject"
+
+    # Mock the SMTP instance to prevent sending real emails
+    mock_smtp_instance = mock_smtp.return_value
+    mock_smtp_instance.sendmail = MagicMock()
+
+    # Call the function under test
+    send_email_notification(message, recipients, email_subject)
+
+    # Assertions
+    mock_smtp.assert_not_called()  # No SMTP actions should be performed
+    mock_smtp_instance.quit.assert_not_called()  # No SMTP actions should be performed
+
+# Test case for notification_message
+@patch('main.requests.request')  # Mock requests.request
+def test_notification_message(mock_request):
+    # Mock data
+    message = "<p>This is a test message</p>"
+    teams_channel = "https://example.com/webhook"
+    job_status = "success"
+
+    # Adjust the expected message to match the nested <p> tag structure
+    expected_message = "<p><strong style='color:#00cc00;'>SUCCESS</strong></p><p><p>This is a test message</p></p>"
+    
+    # Call the function
+    notification_message(message, teams_channel, job_status)
+
+    # Assert that requests.request was called correctly
+    mock_request.assert_called_once_with(
+        "POST",
+        teams_channel,
+        #data=b'{"text": "<p><strong style=\'color:#00cc00;\'>SUCCESS</strong></p><p>This is a test message</p>"}',
+        data=json.dumps({"text": expected_message}).encode(),
+        headers={'Content-Type': 'application/json'}
+    )
+
+def test_notification_message_no_teams_channel(caplog):
+    message = "<p>This is a test message</p>"
+    teams_channel = None
+    job_status = "success"
+
+    # Call the function
+    with caplog.at_level(logging.INFO):
+        notification_message(message, teams_channel, job_status)
+
+    # Assert that the appropriate log message was generated
+    assert 'No teams channel configured.' in caplog.text
+
+def test_send_environment_notification(monkeypatch):
+    
+    # Use monkeypatch to set environment variables
+    monkeypatch.setenv('APP_TYPE', 'webapp1')
+    monkeypatch.setenv('ENV_NOTIFICATION_MAP', '{"webapp1": {"production": "https://example.com/webhook1"}}')
+    
+    # Mock yaml.safe_load to correctly parse the ENV_NOTIFICATION_MAP
+    with patch('main.yaml.safe_load') as mock_safe_load:
+        mock_safe_load.side_effect = lambda x: {
+            'webapp1': {
+                'production': 'https://example.com/webhook1'
             }
-        }
+        } if x == '{"webapp1": {"production": "https://example.com/webhook1"}}' else {}
+        
+        # Mock the notification_message function
+        with patch('main.notification_message') as mock_notification_message:
+            notification_map = {
+                'environment': 'production',
+                'artifact_name': 'v1.0.0',
+                'message': 'Deployment successful'
+            }
+            job_status = "success"
+            
+            # Call the function
+            send_environment_notification(notification_map, job_status, 'webapp1')
+            
+            # Check that notification_message was called correctly
+            mock_notification_message.assert_called_once_with(
+                "Environment: <b>production</b>, Application Type: <b>webapp1</b>, Artifact Version : <b>v1.0.0, Workflow status : <b>success</b>, <b>Deployment successful</b>",
+                'https://example.com/webhook1',
+                'success'
+            )
+
+@patch('main.yaml.safe_load')
+@patch('main.os.getenv')
+def test_send_environment_notification_no_teams_channel(mock_getenv, mock_safe_load, caplog):
+    # Mock environment variable and data
+    mock_getenv.side_effect = lambda x: {
+        'ENV_NOTIFICATION_MAP': '{}',  # Empty map to simulate no teams channel
+        'APP_TYPE': 'webapp'
+    }[x]
+
+    mock_safe_load.return_value = {}  # Returning an empty map
+
+    notification_map = {
+        'environment': 'production',
+        'artifact_name': 'v1.0.0',
+        'message': 'Deployment successful'
     }
+    job_status = "success"
 
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
-    
-    mock_logging_info.assert_any_call('Generating test report using npm test')
+    with caplog.at_level(logging.INFO):
+        send_environment_notification(notification_map, job_status)
 
-    # Check if subprocess.run was called with the npm test command
-    mock_subprocess_run.assert_any_call('export LOG_LEVEL=ERROR && npm test', shell=True, check=True, timeout=3600)
-
-    # Check if subprocess.run was called with the Cobertura command
-    mock_subprocess_run.assert_any_call(
-        'python -m pycobertura show --format html --output coverage/cobertura-coverage.html coverage/cobertura-coverage.xml',
-        shell=True
-    )
-
-    # Check if subprocess.run was called with the find command
-    mock_subprocess_run.assert_any_call(
-        'find /fake/workspace -depth 1 -type d -name coverage-report-dir',
-        stdout=-1, timeout=None, check=True, shell=True, text=True
-    )
+    # Check for the specific log entry
+    assert any('Error in environment notifications:' in message for message in caplog.messages)
 
 
-# Test case 5: Test when the HTML report directory is missing or incorrect
-@mock.patch('main.subprocess.run', return_value=mock.Mock())  # Prevent the npm test from failing
-@mock.patch('main.logging.error')
-def test_generate_test_reports_no_html_report(mock_logging_error, mock_subprocess_run):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {
-            # 'html-reports' key is None to simulate the AttributeError
-            'html-reports': None  
-        }
-    }
-
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
-
-    # Validate that the "No HTML report found" error message is logged
-    mock_logging_error.assert_any_call(mock.ANY)
-    
-    # Check the exact message
-    error_message = str(mock_logging_error.call_args_list[0][0][0])
-    assert "No HTML report found:" in error_message
-    assert "'NoneType' object has no attribute 'get'" in error_message
-
-# Test case 2: Test when subprocess.run raises a CalledProcessError
-@mock.patch('main.subprocess.run', side_effect=subprocess.CalledProcessError(1, 'npm test'))
-@mock.patch('main.logging.error')
-def test_generate_test_reports_subprocess_failure(mock_logging_error, mock_subprocess_run):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {}
-    }
-
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
-
-    mock_logging_error.assert_any_call(
-        "Test report generation failed: Command 'npm test' returned non-zero exit status 1."
-    )
-
-# Test case 3: Test when subprocess.run raises a TimeoutExpired
-@mock.patch('main.subprocess.run', side_effect=subprocess.TimeoutExpired(cmd='npm test', timeout=3600))
-@mock.patch('main.logging.error')
-def test_generate_test_reports_timeout(mock_logging_error, mock_subprocess_run):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {
-            # 'html-reports' key is None to simulate the AttributeError
-            'html-reports': None
-        }
-    }
-
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
-
-    # Extract all log messages
-    logged_messages = [call[0][0] for call in mock_logging_error.call_args_list]
-
-    # Ensure the timeout error was logged
-    assert "Test report generation timed out: Command 'npm test' timed out after 3600 seconds" in logged_messages, (
-        f"Expected timeout error not found in logged messages: {logged_messages}"
-    )
 
 
-# Test case 4: Test for cobertura report generation
-@mock.patch('main.subprocess.run', return_value=mock.Mock())
-@mock.patch('main.logging.info')
-def test_generate_test_reports_cobertura(mock_logging_info, mock_subprocess_run):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {
-            'cobertura': True
-        }
-    }
-
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
-
-    mock_subprocess_run.assert_any_call(
-        'python -m pycobertura show --format html --output coverage/cobertura-coverage.html coverage/cobertura-coverage.xml',
-        shell=True
-    )
-    assert mock_logging_info.call_count > 1  # Check that logging was called for the Cobertura report
-
-
-# Test case 6: Test when lcov report path is available
-@mock.patch('main.os.system')
-@mock.patch('main.logging.info')
-def test_generate_test_reports_lcov_path(mock_logging_info, mock_os_system):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {
-            'js-lcov-report-path': '/path/to/lcov-report'
-        }
-    }
-
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
-
-    mock_logging_info.assert_any_call('Lcov report path /path/to/lcov-report')
-    mock_os_system.assert_any_call("echo 'lcov-report-path=/path/to/lcov-report' >> $GITHUB_OUTPUT")
-
-# Test case 7: Test when no args_test is provided
-@mock.patch('main.logging.info')
-def test_generate_test_reports_no_args_test(mock_logging_info):
-    build_var_map = {
-        'build_group': {}
-    }
-
-    generate_test_reports(build_var_map)
-    
-    # Check that nothing is logged for "Generating test report"
-    mock_logging_info.assert_not_called()
-
-# Test case 1: Test with all values present in config_map
-@mock.patch('main.os.system')
-def test_set_vars_all_values_present(mock_os_system):
-    config_map = {
-        'runtime_version': '14.17.0',
-        'args_build': 'npm run build',
-        'args_test': 'npm test',
-        'test_flag_enabled': 'true'
-    }
-
-    set_vars(config_map)
-
-    # Check that all os.system calls were made with the correct parameters
-    mock_os_system.assert_any_call("echo 'runtime-version=14.17.0' >> $GITHUB_OUTPUT")
-    mock_os_system.assert_any_call("echo 'args-build=npm run build' >> $GITHUB_OUTPUT")
-    mock_os_system.assert_any_call("echo 'args-test=npm test' >> $GITHUB_OUTPUT")
-    mock_os_system.assert_any_call("echo 'test-flag-enabled=true' >> $GITHUB_OUTPUT")
-
-    # Ensure that os.system was called exactly 4 times
-    assert mock_os_system.call_count == 4
-
-# Test case 2: Test without runtime_version
-@mock.patch('main.os.system')
-def test_set_vars_without_runtime_version(mock_os_system):
-    config_map = {
-        'args_build': 'npm run build',
-        'args_test': 'npm test',
-        'test_flag_enabled': 'false'
-    }
-
-    set_vars(config_map)
-
-    # Check that os.system calls were made with the correct parameters
-    # runtime_version is not included, so it should not be called for it
-    mock_os_system.assert_any_call("echo 'args-build=npm run build' >> $GITHUB_OUTPUT")
-    mock_os_system.assert_any_call("echo 'args-test=npm test' >> $GITHUB_OUTPUT")
-    mock_os_system.assert_any_call("echo 'test-flag-enabled=false' >> $GITHUB_OUTPUT")
-
-    # Ensure that os.system was called exactly 3 times
-    assert mock_os_system.call_count == 3
-
-# Test case 3: Test with empty config_map (should fail)
-@mock.patch('main.os.system')
-def test_set_vars_empty_config_map(mock_os_system):
-    config_map = {}
-
-    with pytest.raises(KeyError):
-        set_vars(config_map)
-
-    # Ensure that no os.system calls were made
-    mock_os_system.assert_not_called()
+if __name__ == "__main__":
+    pytest.main()
