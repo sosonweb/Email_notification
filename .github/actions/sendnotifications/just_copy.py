@@ -7,7 +7,7 @@ import json
 import yaml
 from main import send_email_notification, notification_message, send_environment_notification
 
-# Define a test for the send_email_notifications function
+# Define a test for the send_email_notification function
 def test_send_email_notification_with_all_vars(monkeypatch):
     # Use monkeypatch to set environment variables
     monkeypatch.setenv('PROJECT_GIT_REPO', 'test-repo')
@@ -22,10 +22,12 @@ def test_send_email_notification_with_all_vars(monkeypatch):
     email_subject = "Test Subject"
 
     # Mock the SMTP instance to prevent sending real emails
+    sent_emails = []
+
     def mock_smtp(*args, **kwargs):
         class MockSMTP:
             def sendmail(self, from_addr, to_addrs, msg):
-                pass
+                sent_emails.append((from_addr, to_addrs, msg))
 
             def quit(self):
                 pass
@@ -37,11 +39,16 @@ def test_send_email_notification_with_all_vars(monkeypatch):
     # Call the function under test
     send_email_notification(message, recipients, email_subject)
 
-    # Since it's a mock free implementation, we don't assert SMTP methods directly.
-    # Instead, we ensure no exceptions were raised during execution.
+    # Assertions
+    assert len(sent_emails) == 1
+    from_addr, to_addrs, msg = sent_emails[0]
+    assert from_addr == 'githubactions@kp.org'
+    assert to_addrs == "test@example.com"
+    assert email_subject in msg
+    assert message in msg
 
 
-def test_send_email_notification_no_recipients(monkeypatch):
+def test_send_email_notification_no_recipients(monkeypatch, caplog):
     # Use monkeypatch to set environment variables
     monkeypatch.setenv('PROJECT_GIT_REPO', 'test-repo')
     monkeypatch.setenv('NOTIFICATION_MAP', '{}')
@@ -56,10 +63,12 @@ def test_send_email_notification_no_recipients(monkeypatch):
     email_subject = "Test Subject"
 
     # Mock the SMTP instance to prevent sending real emails
+    sent_emails = []
+
     def mock_smtp(*args, **kwargs):
         class MockSMTP:
             def sendmail(self, from_addr, to_addrs, msg):
-                pass
+                sent_emails.append((from_addr, to_addrs, msg))
 
             def quit(self):
                 pass
@@ -68,10 +77,13 @@ def test_send_email_notification_no_recipients(monkeypatch):
 
     monkeypatch.setattr(smtplib, 'SMTP', mock_smtp)
 
-    # Call the function under test
-    send_email_notification(message, recipients, email_subject)
+    # Call the function under test with logging capture
+    with caplog.at_level(logging.INFO):
+        send_email_notification(message, recipients, email_subject)
 
-    # Ensure that no errors were raised due to the empty recipients list.
+    # Assertions
+    assert len(sent_emails) == 0  # Ensure no emails were sent
+    assert "No emails addresses configured." in caplog.text  # Ensure the correct log message was generated
 
 
 # Test case for notification_message
@@ -181,7 +193,7 @@ def test_send_environment_notification_no_channel(monkeypatch):
     # Since no matching teams_channel, ensure no exceptions were raised
 
 
-def test_send_environment_notification_exception_handling(monkeypatch):
+def test_send_environment_notification_exception_handling(monkeypatch, caplog):
     # Setting environment variables using monkeypatch with invalid YAML to trigger an exception
     monkeypatch.setenv('ENV_NOTIFICATION_MAP', 'invalid_yaml')
     monkeypatch.setenv('APP_TYPE', 'app_type')
@@ -193,7 +205,7 @@ def test_send_environment_notification_exception_handling(monkeypatch):
     }
     job_status = 'Failed'
 
-    # Mock logging to capture the output
+    # Call the function with logging capture
     with caplog.at_level(logging.INFO):
         send_environment_notification(notification_map, job_status)
 
