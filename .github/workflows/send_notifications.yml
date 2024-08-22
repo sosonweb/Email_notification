@@ -16,8 +16,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    #env:
-      #NOTIFY_FLAGS: '{"send-teams-notification": true}'  # Setting the environment variable
+    env:
+      NOTIFY_FLAGS: '{"send-teams-notification": true}'  # Setting the environment variable
     steps:
     - uses: actions/checkout@v2
 
