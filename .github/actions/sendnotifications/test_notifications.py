@@ -6,6 +6,7 @@ import logging,json
 import yaml
 from unittest import mock
 
+'''
 # Define a test for the send_email_notification function
 @patch('main.smtplib.SMTP')
 @patch.dict(os.environ, {
@@ -37,6 +38,40 @@ def test_send_email_notification_with_all_vars(mock_smtp):
         msg=mock_smtp_instance.sendmail.call_args[1]['msg']
     )
     mock_smtp_instance.quit.assert_called_once()
+'''
+
+# Define a test for the send_email_notification function
+def test_send_email_notification_with_all_vars(monkeypatch):
+    # Use monkeypatch to set environment variables
+    monkeypatch.setenv('PROJECT_GIT_REPO', 'test-repo')
+    monkeypatch.setenv('NOTIFICATION_MAP', '{"email_recipients": ["test@example.com"], "subject": "Test Subject", "message": "Test Message"}')
+    monkeypatch.setenv('APP_TYPE', 'web')
+    monkeypatch.setenv('BUILD_URL', 'http://build-url.com')
+    monkeypatch.setenv('NOTIFY_FLAGS', '{"send-teams-notification": true}')
+
+    # Define test data
+    message = "<p>This is a test message</p>"
+    recipients = ["test@example.com"]
+    email_subject = "Test Subject"
+
+    # Mock the SMTP instance to prevent sending real emails
+    with patch('main.smtplib.SMTP') as mock_smtp:
+        mock_smtp_instance = mock_smtp.return_value
+        mock_smtp_instance.sendmail = MagicMock()
+
+        # Call the function under test
+        send_email_notification(message, recipients, email_subject)
+
+        # Assertions
+        mock_smtp.assert_called_once_with('mta.kp.org', 25)
+        mock_smtp_instance.sendmail.assert_called_once_with(
+            from_addr='githubactions@kp.org',
+            to_addrs='test@example.com',
+            msg=mock_smtp_instance.sendmail.call_args[1]['msg']
+        )
+        mock_smtp_instance.quit.assert_called_once()
+
+
     
 @patch('main.smtplib.SMTP')
 @patch.dict(os.environ, {
@@ -190,6 +225,7 @@ def test_send_environment_notification_success(monkeypatch):
             "Artifact Version : <b>v1.2.3, Workflow status : <b>Success</b>, <b>Deployment successful!</b>"
         )
         mock_notification_message.assert_called_once_with(expected_message, 'teams-channel-id-prod', 'Success')
+
 
 def test_send_environment_notification_no_channel(monkeypatch):
     # Setting environment variables using monkeypatch with no matching channel
