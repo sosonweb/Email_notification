@@ -227,3 +227,31 @@ def test_generate_test_reports_subprocess_failure(mock_run, caplog):
     # Verify that the error was logged
     assert any("Command 'npm test' returned non-zero exit status 1." in record.message for record in caplog.records)
 
+
+@mock.patch('main.subprocess.run', side_effect=subprocess.TimeoutExpired(cmd='npm test', timeout=3600))
+def test_generate_test_reports_timeout(mock_run, caplog):
+    build_var_map = {
+        'args_test': 'npm test',
+        'build_group': {}
+    }
+
+    with mock.patch('main.workspace', '/fake/workspace'):
+        generate_test_reports(build_var_map)
+
+    # Verify that the timeout error was logged
+    assert any("Command 'npm test' timed out after 3600 seconds" in record.message for record in caplog.records)
+
+@mock.patch('main.subprocess.run', side_effect=RuntimeError("Runtime error occurred"))
+def test_generate_test_reports_runtime_error(mock_run, caplog):
+    build_var_map = {
+        'args_test': 'npm test',
+        'build_group': {}
+    }
+
+    with mock.patch('main.workspace', '/fake/workspace'):
+        generate_test_reports(build_var_map)
+
+    # Verify that the runtime error was logged
+    assert any("Runtime error occurred" in record.message for record in caplog.records)
+
+
