@@ -98,6 +98,8 @@ def test_notification_message_no_teams_channel(caplog):
     # Assert that the appropriate log message was generated
     assert 'No teams channel configured.' in caplog.text
 
+'''
+
 def test_send_environment_notification(monkeypatch):
     
     # Use monkeypatch to set environment variables
@@ -130,6 +132,7 @@ def test_send_environment_notification(monkeypatch):
                 'https://example.com/webhook1',
                 'success'
             )
+'''
 
 @patch('main.yaml.safe_load')
 @patch('main.os.getenv')
@@ -155,7 +158,34 @@ def test_send_environment_notification_no_teams_channel(mock_getenv, mock_safe_l
     # Check for the specific log entry
     assert any('Error in environment notifications:' in message for message in caplog.messages)
 
+def test_send_environment_notification_success(monkeypatch):
+    # Setting environment variables using monkeypatch
+    env_notification_map = {
+        'app_type': {
+            'production': 'teams-channel-id-prod',
+            'staging': 'teams-channel-id-staging'
+        }
+    }
+    monkeypatch.setenv('ENV_NOTIFICATION_MAP', yaml.dump(env_notification_map))
+    monkeypatch.setenv('APP_TYPE', 'app_type')
 
+    notification_map = {
+        'environment': 'production',
+        'artifact_name': 'v1.2.3',
+        'message': 'Deployment successful!'
+    }
+    job_status = 'Success'
+
+    # Mocking the notification_message function
+    with mock.patch('main.notification_message') as mock_notification_message:
+        send_environment_notification(notification_map, job_status, 'app_type')
+
+        # Asserting that notification_message was called with the correct parameters
+        expected_message = (
+            "Environment: <b>production</b>, Application Type: <b>app_type</b>, "
+            "Artifact Version : <b>v1.2.3, Workflow status : <b>Success</b>, <b>Deployment successful!</b>"
+        )
+        mock_notification_message.assert_called_once_with(expected_message, 'teams-channel-id-prod', 'Success')
 
 
 if __name__ == "__main__":
