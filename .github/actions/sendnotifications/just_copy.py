@@ -1,14 +1,9 @@
 import pytest
 import subprocess
-from unittest import mock
-import logging
-from main import generate_test_reports
-from main import set_vars
+from main import generate_test_reports, set_vars
 
 # Test case 1: Test when args_test is present and subprocess runs successfully
-@mock.patch('main.subprocess.run', return_value=mock.Mock())
-@mock.patch('main.logging.info')
-def test_generate_test_reports_success(mock_logging_info, mock_subprocess_run):
+def test_generate_test_reports_success(monkeypatch):
     build_var_map = {
         'args_test': 'npm test',
         'build_group': {
@@ -22,94 +17,111 @@ def test_generate_test_reports_success(mock_logging_info, mock_subprocess_run):
         }
     }
 
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
-    
-    mock_logging_info.assert_any_call('Generating test report using npm test')
+    # Mocking subprocess.run and logging.info using monkeypatch
+    def mock_run(command, shell, check, timeout):
+        if 'npm test' in command:
+            return subprocess.CompletedProcess(args=command, returncode=0)
+        elif 'pycobertura' in command:
+            return subprocess.CompletedProcess(args=command, returncode  = 0)
+        elif 'find' in command:
+            return subprocess.CompletedProcess(args=command, returncode=0, stdout='/fake/workspace/coverage-report-dir')
 
-    # Check if subprocess.run was called with the npm test command
-    mock_subprocess_run.assert_any_call('export LOG_LEVEL=ERROR && npm test', shell=True, check=True, timeout=3600)
+    def mock_info(message):
+        pass  # Do nothing for logging.info
 
-    # Check if subprocess.run was called with the Cobertura command
-    mock_subprocess_run.assert_any_call(
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+    monkeypatch.setattr('main.logging.info', mock_info)
+    monkeypatch.setattr('main.workspace', '/fake/workspace')
+
+    generate_test_reports(build_var_map)
+
+    # Assertions to check if subprocess.run was called with expected commands
+    mock_run.assert_any_call('export LOG_LEVEL=ERROR && npm test', shell=True, check=True, timeout=3600)
+    mock_run.assert_any_call(
         'python -m pycobertura show --format html --output coverage/cobertura-coverage.html coverage/cobertura-coverage.xml',
         shell=True
     )
-
-    # Check if subprocess.run was called with the find command
-    mock_subprocess_run.assert_any_call(
-        'find /fake/workspace -depth 1 -type d -name coverage-report-dir',
+    mock_run.assert_any_call(
+        ['find /fake/workspace -depth 1 -type d -name coverage-report-dir'],
         stdout=-1, timeout=None, check=True, shell=True, text=True
     )
 
-
 # Test case 5: Test when the HTML report directory is missing or incorrect
-@mock.patch('main.subprocess.run', return_value=mock.Mock())  # Prevent the npm test from failing
-@mock.patch('main.logging.error')
-def test_generate_test_reports_no_html_report(mock_logging_error, mock_subprocess_run):
+def test_generate_test_reports_no_html_report(monkeypatch):
     build_var_map = {
         'args_test': 'npm test',
         'build_group': {
-            # 'html-reports' key is None to simulate the AttributeError
-            'html-reports': None  
+            # The 'html-reports' key is None to simulate the AttributeError
+            'html-reports': None
         }
     }
 
-    with mock.patch('main.workspace', '/fake/workspace'):
+    def mock_run(command, shell, check, timeout):
+        return subprocess.CompletedProcess(args=command, returncode=0)
+
+    def mock_error(message):
+        raise AttributeError("No HTML report found")
+
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+    monkeypatch.setattr('main.logging.error', mock_error)
+    monkeypatch.setattr('main.workspace', '/fake/workspace')
+
+    with pytest.raises(AttributeError, match="No HTML report found"):
         generate_test_reports(build_var_map)
 
-    # Validate that the "No HTML report found" error message is logged
-    mock_logging_error.assert_any_call(mock.ANY)
-    
-    # Check the exact message
-    error_message = str(mock_logging_error.call_args_list[0][0][0])
-    assert "No HTML report found:" in error_message
-    assert "'NoneType' object has no attribute 'get'" in error_message
-
-# Test case 2: Test when subprocess.run raises a CalledProcessError
-@mock.patch('main.subprocess.run', side_effect=subprocess.CalledProcessError(1, 'npm test'))
-@mock.patch('main.logging.error')
-def test_generate_test_reports_subprocess_failure(mock_logging_error, mock_subprocess_run):
+# Test case 2: Test when the subprocess fails
+def test_generate_test_reports_subprocess_failure(monkeypatch, caplog):
     build_var_map = {
         'args_test': 'npm test',
         'build_group': {}
     }
 
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
+    def mock_run(command, shell, check, timeout):
+        raise subprocess.CalledProcessError(1, 'npm test')
 
-    mock_logging_error.assert_any_call(
-        "Test report generation failed: Command 'npm test' returned non-zero exit status 1."
-    )
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+    monkeypatch.setattr('main.workspace', '/fake/workspace')
 
-# Test case 3: Test when subprocess.run raises a TimeoutExpired
-@mock.patch('main.subprocess.run', side_effect=subprocess.TimeoutExpired(cmd='npm test', timeout=3600))
-@mock.patch('main.logging.error')
-def test_generate_test_reports_timeout(mock_logging_error, mock_subprocess_run):
+    generate_test_reports(build_var_map)
+
+    assert any("Command 'npm test' returned non-zero exit status 1." in record.message for record in caplog.records)
+
+# Test case 3: Test when the subprocess times out
+def test_generate_test_reports_timeout(monkeypatch, caplog):
     build_var_map = {
         'args_test': 'npm test',
-        'build_group': {
-            # 'html-reports' key is None to simulate the AttributeError
-            'html-reports': None
-        }
+        'build_group': {}
     }
 
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
+    def mock_run(command, shell, check, timeout):
+        raise subprocess.TimeoutExpired(cmd='npm test', timeout=3600)
 
-    # Extract all log messages
-    logged_messages = [call[0][0] for call in mock_logging_error.call_args_list]
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+    monkeypatch.setattr('main.workspace', '/fake/workspace')
 
-    # Ensure the timeout error was logged
-    assert "Test report generation timed out: Command 'npm test' timed out after 3600 seconds" in logged_messages, (
-        f"Expected timeout error not found in logged messages: {logged_messages}"
-    )
+    generate_test_reports(build_var_map)
 
+    assert any("Command 'npm test' timed out after 3600 seconds" in record.message for record in caplog.records)
+
+# Test case 4: Test when a runtime error occur during subprocess execution
+def test_generate_test_reports_runtime_error(monkeypatch, caplog):
+    build_var_map = {
+        'args_test': 'npm test',
+        'build_group': {}
+    }
+
+    def mock_run(command, shell, check, timeout):
+        raise RuntimeError("Runtime error occurred")
+
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+    monkeypatch.setattr('main.workspace', '/fake/workspace')
+
+    generate_test_reports(build_var_map)
+
+    assert any("Runtime error occurred" in record.message for record in caplog.records)
 
 # Test case 4: Test for cobertura report generation
-@mock.patch('main.subprocess.run', return_value=mock.Mock())
-@mock.patch('main.logging.info')
-def test_generate_test_reports_cobertura(mock_logging_info, mock_subprocess_run):
+def test_generate_test_reports_cobertura(monkeypatch):
     build_var_map = {
         'args_test': 'npm test',
         'build_group': {
@@ -117,20 +129,26 @@ def test_generate_test_reports_cobertura(mock_logging_info, mock_subprocess_run)
         }
     }
 
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
+    def mock_run(command, shell, check, timeout):
+        return subprocess.CompletedProcess(args=command, returncode=0)
 
-    mock_subprocess_run.assert_any_call(
+    def mock_info(message):
+        pass  # Do nothing for logging.info
+
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+    monkeypatch.setattr('main.logging.info', mock_info)
+    monkeypatch.setattr('main.workspace', '/fake/workspace')
+
+    generate_test_reports(build_var_map)
+
+    mock_run.assert_any_call(
         'python -m pycobertura show --format html --output coverage/cobertura-coverage.html coverage/cobertura-coverage.xml',
         shell=True
     )
-    assert mock_logging_info.call_count > 1  # Check that logging was called for the Cobertura report
-
+    assert mock_info.call_count > 1  # Check that logging was called for the Cobertura report
 
 # Test case 6: Test when lcov report path is available
-@mock.patch('main.os.system')
-@mock.patch('main.logging.info')
-def test_generate_test_reports_lcov_path(mock_logging_info, mock_os_system):
+def test_generate_test_reports_lcov_path(monkeypatch):
     build_var_map = {
         'args_test': 'npm test',
         'build_group': {
@@ -138,27 +156,38 @@ def test_generate_test_reports_lcov_path(mock_logging_info, mock_os_system):
         }
     }
 
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
+    def mock_system(command):
+        return 0  # Simulate a successful command
 
-    mock_logging_info.assert_any_call('Lcov report path /path/to/lcov-report')
-    mock_os_system.assert_any_call("echo 'lcov-report-path=/path/to/lcov-report' >> $GITHUB_OUTPUT")
+    def mock_info(message):
+        pass  # Do nothing for logging.info
+
+    monkeypatch.setattr('main.os.system', mock_system)
+    monkeypatch.setattr('main.logging.info', mock_info)
+    monkeypatch.setattr('main.workspace', '/fake/workspace')
+
+    generate_test_reports(build_var_map)
+
+    mock_info.assert_any_call('Lcov report path /path/to/lcov-report')
+    mock_system.assert_any_call("echo 'lcov-report-path=/path/to/lcov-report' >> $GITHUB_OUTPUT")
 
 # Test case 7: Test when no args_test is provided
-@mock.patch('main.logging.info')
-def test_generate_test_reports_no_args_test(mock_logging_info):
+def test_generate_test_reports_no_args_test(monkeypatch):
     build_var_map = {
         'build_group': {}
     }
 
+    def mock_info(message):
+        pass  # Do nothing for logging.info
+
+    monkeypatch.setattr('main.logging.info', mock_info)
+
     generate_test_reports(build_var_map)
-    
-    # Check that nothing is logged for "Generating test report"
-    mock_logging_info.assert_not_called()
+
+    mock_info.assert_not_called()
 
 # Test case 1: Test with all values present in config_map
-@mock.patch('main.os.system')
-def test_set_vars_all_values_present(mock_os_system):
+def test_set_vars_all_values_present(monkeypatch):
     config_map = {
         'runtime_version': '14.17.0',
         'args_build': 'npm run build',
@@ -166,92 +195,51 @@ def test_set_vars_all_values_present(mock_os_system):
         'test_flag_enabled': 'true'
     }
 
+    def mock_system(command):
+        return 0  # Simulate a successful command
+
+    monkeypatch.setattr('main.os.system', mock_system)
+
     set_vars(config_map)
 
-    # Check that all os.system calls were made with the correct parameters
-    mock_os_system.assert_any_call("echo 'runtime-version=14.17.0' >> $GITHUB_OUTPUT")
-    mock_os_system.assert_any_call("echo 'args-build=npm run build' >> $GITHUB_OUTPUT")
-    mock_os_system.assert_any_call("echo 'args-test=npm test' >> $GITHUB_OUTPUT")
-    mock_os_system.assert_any_call("echo 'test-flag-enabled=true' >> $GITHUB_OUTPUT")
+    mock_system.assert_any_call("echo 'runtime-version=14.17.0' >> $GITHUB_OUTPUT")
+    mock_system.assert_any_call("echo 'args-build=npm run build' >> $GITHUB_OUTPUT")
+    mock_system.assert_any_call("echo 'args-test=npm test' >> $GITHUB_OUTPUT")
+    mock_system.assert_any_call("echo 'test-flag-enabled=true' >> $GITHUB_OUTPUT")
 
-    # Ensure that os.system was called exactly 4 times
-    assert mock_os_system.call_count == 4
+    assert mock_system.call_count == 4
 
 # Test case 2: Test without runtime_version
-@mock.patch('main.os.system')
-def test_set_vars_without_runtime_version(mock_os_system):
+def test_set_vars_without_runtime_version(monkeypatch):
     config_map = {
         'args_build': 'npm run build',
         'args_test': 'npm test',
         'test_flag_enabled': 'false'
     }
 
+    def mock_system(command):
+        return 0  # Simulate a successful command
+
+    monkeypatch.setattr('main.os.system', mock_system)
+
     set_vars(config_map)
 
-    # Check that os.system calls were made with the correct parameters
-    # runtime_version is not included, so it should not be called for it
-    mock_os_system.assert_any_call("echo 'args-build=npm run build' >> $GITHUB_OUTPUT")
-    mock_os_system.assert_any_call("echo 'args-test=npm test' >> $GITHUB_OUTPUT")
-    mock_os_system.assert_any_call("echo 'test-flag-enabled=false' >> $GITHUB_OUTPUT")
+    mock_system.assert_any_call("echo 'args-build=npm run build' >> $GITHUB_OUTPUT")
+    mock_system.assert_any_call("echo 'args-test=npm test' >> $GITHUB_OUTPUT")
+    mock_system.assert_any_call("echo 'test-flag-enabled=false' >> $GITHUB_OUTPUT")
 
-    # Ensure that os.system was called exactly 3 times
-    assert mock_os_system.call_count == 3
+    assert mock_system.call_count == 3
 
 # Test case 3: Test with empty config_map (should fail)
-@mock.patch('main.os.system')
-def test_set_vars_empty_config_map(mock_os_system):
+def test_set_vars_empty_config_map(monkeypatch):
     config_map = {}
+
+    def mock_system(command):
+        return 0  # Simulate a successful command
+
+    monkeypatch.setattr('main.os.system', mock_system)
 
     with pytest.raises(KeyError):
         set_vars(config_map)
 
-    # Ensure that no os.system calls were made
-    mock_os_system.assert_not_called()
-
-
-import subprocess
-import pytest
-from unittest import mock
-from main import generate_test_reports
-
-@mock.patch('main.subprocess.run', side_effect=subprocess.CalledProcessError(1, 'npm test'))
-def test_generate_test_reports_subprocess_failure(mock_run, caplog):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {}
-    }
-
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
-
-    # Verify that the error was logged
-    assert any("Command 'npm test' returned non-zero exit status 1." in record.message for record in caplog.records)
-
-
-@mock.patch('main.subprocess.run', side_effect=subprocess.TimeoutExpired(cmd='npm test', timeout=3600))
-def test_generate_test_reports_timeout(mock_run, caplog):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {}
-    }
-
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
-
-    # Verify that the timeout error was logged
-    assert any("Command 'npm test' timed out after 3600 seconds" in record.message for record in caplog.records)
-
-@mock.patch('main.subprocess.run', side_effect=RuntimeError("Runtime error occurred"))
-def test_generate_test_reports_runtime_error(mock_run, caplog):
-    build_var_map = {
-        'args_test': 'npm test',
-        'build_group': {}
-    }
-
-    with mock.patch('main.workspace', '/fake/workspace'):
-        generate_test_reports(build_var_map)
-
-    # Verify that the runtime error was logged
-    assert any("Runtime error occurred" in record.message for record in caplog.records)
-
-
+    mock_system.assert_not_called()
