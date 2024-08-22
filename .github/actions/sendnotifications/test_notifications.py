@@ -5,7 +5,7 @@ import logging
 from main import generate_test_reports
 from main import set_vars
 
-# Test case 1: Test when args_test is present and subprocess runs successfully
+# Test case 1: Test when args_test is present and subprocess runs successfull
 @mock.patch('main.subprocess.run', return_value=mock.Mock())
 @mock.patch('main.logging.info')
 def test_generate_test_reports_success(mock_logging_info, mock_subprocess_run):
