@@ -213,5 +213,53 @@ def test_send_environment_notification_exception_handling(monkeypatch, caplog):
     assert "Error in environment notifications:" in caplog.text
 
 
+def test_generate_test_reports_html_report_path(monkeypatch):
+    # Set up the test data
+    build_var_map = {
+        'args_test': 'npm test',
+        'build_group': {
+            'html-reports': {
+                'pipeline-coverage-report': {
+                    'report-dir': 'coverage-report-dir'
+                }
+            }
+        }
+    }
+
+    # Mock the workspace path
+    monkeypatch.setattr('main.workspace', '/fake/workspace')
+    
+    # Mock subprocess.check_output to simulate finding the HTML report directory
+    mock_check_output = mock.Mock(return_value='/fake/workspace/coverage-report-dir\n')
+    monkeypatch.setattr(subprocess, 'check_output', mock_check_output)
+    
+    # Mock os.system and logging.info
+    mock_os_system = mock.Mock()
+    monkeypatch.setattr('main.os.system', mock_os_system)
+    
+    mock_logging_info = mock.Mock()
+    monkeypatch.setattr('main.logging.info', mock_logging_info)
+    
+    # Call the function under test
+    generate_test_reports(build_var_map)
+    
+    # Assert that subprocess.check_output was called with the correct command
+    mock_check_output.assert_called_once_with("find /fake/workspace -depth 1 -type d -name coverage-report-dir", shell=True, text=True)
+    
+    # Assert that logging.info and os.system were called correctly if the path is found
+    mock_logging_info.assert_any_call('HTML report path /fake/workspace/coverage-report-dir')
+    mock_os_system.assert_any_call("echo 'html-report-path=/fake/workspace/coverage-report-dir' >> $GITHUB_OUTPUT")
+
+    # Modify the mock to simulate the case where no directory is found
+    mock_check_output.return_value = ''
+    
+    # Call the function again to handle the "no HTML report produced" scenario
+    generate_test_reports(build_var_map)
+    
+    # Assert that the appropriate log message is written
+    mock_logging_info.assert_any_call("Test execution did not produce any HTML reports: ")
+
+
+
 if __name__ == "__main__":
     pytest.main()
