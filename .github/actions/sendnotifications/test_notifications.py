@@ -5,7 +5,7 @@ from main import send_email_notification,notification_message, send_environment_
 import logging,json
 import yaml
 
-# Define a test for the send_email_notification function
+# Define test for the send_email_notification function
 @patch('main.smtplib.SMTP')
 @patch.dict(os.environ, {
     'PROJECT_GIT_REPO': 'test-repo',
