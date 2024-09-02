@@ -10,13 +10,14 @@ on:
       - main
       - v1
       - Akhilmalakareddy-patch-1
+      - pranitha_patch
   workflow_dispatch:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
+    env:
+      NOTIFY_FLAGS: '{"send-teams-notification": true}'  # Setting the environment variable
     steps:
     - uses: actions/checkout@v2
 
@@ -34,7 +35,7 @@ jobs:
         
     - name: Run tests with pytest
       run: |
-        pytest .github/actions/sendnotification/test_notifications.py --verbose --disable-warnings
+        pytest .github/actions/sendnotifications/test_notifications.py --verbose --disable-warnings
 
     - name: Archive test results
       if: always()
