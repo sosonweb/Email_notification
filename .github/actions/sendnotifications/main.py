@@ -59,7 +59,7 @@ def send_email_notification(message, recipients, email_subject):
         return
     msg = MIMEMultipart()
     email_sender = 'githubactions@kp.org'
-    msg['Subject'] = email_subject
+    msg['Subject'] = 'hello'
     msg['From'] = email_sender
     msg.attach(MIMEText(message, 'html'))
     s = smtplib.SMTP('mta.kp.org',25)
