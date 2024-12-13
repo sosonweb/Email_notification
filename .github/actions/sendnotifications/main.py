@@ -16,7 +16,7 @@ notification_flag = yaml.safe_load(os.getenv('NOTIFY_FLAGS'))
 log_level = os.getenv('LOG_LEVEL') if os.getenv('LOG_LEVEL') else '20'
 logging.basicConfig(level=int(log_level), format='%(asctime)s :: %(levelname)s :: %(message)s')
 
-
+#hello
 def main():
     notification_map_str = os.getenv('NOTIFICATION_MAP')
     notification_flag = yaml.safe_load(os.getenv('NOTIFY_FLAGS'))
