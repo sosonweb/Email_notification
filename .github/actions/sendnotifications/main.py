@@ -64,7 +64,7 @@ def send_email_notification(message, recipients, email_subject):
     msg.attach(MIMEText(message, 'html'))
     s = smtplib.SMTP('mta.kp.org',25)
     for email_recipient in recipients:
-        msg['To'] = email_recipient
+        msg['To'] = 'pranitha@dell.org'
         s.sendmail(from_addr=email_sender, to_addrs=email_recipient, msg=msg.as_string())
     s.quit()
     
