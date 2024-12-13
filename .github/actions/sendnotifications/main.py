@@ -52,11 +52,11 @@ def main():
 
 def send_email_notification(message, recipients, email_subject):
     if recipients and len(recipients) > 0:
-        # logging.info(type(recipients))
+        logging.info(type(recipients))
         logging.info(f'[INFO] Sending emails notification to {recipients}.')
     else:
         logging.info('No emails addresses configured.')
-        return
+        #return
     msg = MIMEMultipart()
     email_sender = 'githubactions@kp.org'
     msg['Subject'] = email_subject
