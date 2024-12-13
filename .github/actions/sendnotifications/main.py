@@ -7,7 +7,7 @@ import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-
+#jhfgdfjg
 repo_name = os.getenv('PROJECT_GIT_REPO')
 notification_map_str = os.getenv('NOTIFICATION_MAP')
 app_type = os.getenv('APP_TYPE')
